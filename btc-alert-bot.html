@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC Alert Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a0f;
+    --surface: #0a1520;
+    --border: #0e2a40;
+    --orange: #f7931a;
+    --orange-dim: rgba(247,147,26,0.15);
+    --green: #00e676;
+    --green-dim: rgba(0,230,118,0.12);
+    --red: #ff1744;
+    --red-dim: rgba(255,23,68,0.12);
+    --text: #c8dce8;
+    --muted: #4a6a80;
+    --cyan: #00bcd4;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,188,212,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,188,212,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .btc-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--orange);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff;
+    box-shadow: 0 0 16px rgba(247,147,26,0.5);
+  }
+  .logo-text { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  .logo-text span { color: var(--orange); }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Price Card */
+  .price-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .price-card::after {
+    content: '₿';
+    position: absolute; right: -10px; top: -20px;
+    font-size: 120px; font-weight: 900;
+    color: rgba(247,147,26,0.04);
+    font-family: 'Share Tech Mono';
+    pointer-events: none;
+  }
+  .price-label { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .price-main {
+    font-family: 'Share Tech Mono';
+    font-size: 36px;
+    color: var(--orange);
+    text-shadow: 0 0 20px rgba(247,147,26,0.4);
+    line-height: 1;
+  }
+  .price-change {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 14px; font-weight: 600;
+    margin-top: 6px; padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .price-change.up { background: var(--green-dim); color: var(--green); }
+  .price-change.down { background: var(--red-dim); color: var(--red); }
+
+  .price-row { display: flex; align-items: flex-end; justify-content: space-between; }
+  .last-update { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono'; }
+
+  /* Signal Bar */
+  .signal-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .signal-title { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+  .signal-buttons { display: flex; gap: 10px; }
+  .sig-btn {
+    flex: 1; padding: 12px;
+    border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'Rajdhani'; font-size: 15px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .sig-btn.up { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+  .sig-btn.down { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,23,68,0.3); }
+  .sig-btn:active { transform: scale(0.97); }
+  .sig-btn.active-up { background: var(--green); color: #000; box-shadow: 0 0 16px rgba(0,230,118,0.4); }
+  .sig-btn.active-down { background: var(--red); color: #fff; box-shadow: 0 0 16px rgba(255,23,68,0.4); }
+
+  .signal-meter { margin-top: 10px; }
+  .meter-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .meter-labels { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--muted); }
+
+  /* Alert Config */
+  .alert-config {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .section-title { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+  .alert-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .alert-row:last-child { margin-bottom: 0; }
+  .alert-label { font-size: 14px; font-weight: 600; }
+  .alert-label small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .input-group { display: flex; align-items: center; gap: 6px; }
+  .price-input {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Share Tech Mono'; font-size: 14px;
+    padding: 6px 10px; border-radius: 8px; width: 110px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .price-input:focus { border-color: var(--orange); }
+  .toggle {
+    width: 42px; height: 24px; border-radius: 12px;
+    background: var(--border); position: relative; cursor: pointer;
+    transition: background 0.3s; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--orange); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%; background: #fff;
+    transition: transform 0.3s;
+  }
+  .toggle.on::after { transform: translateX(18px); }
+
+  /* AI Chat */
+  .ai-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .ai-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ai-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), var(--orange));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .ai-name { font-size: 14px; font-weight: 700; }
+  .ai-sub { font-size: 11px; color: var(--muted); }
+  .ai-messages {
+    padding: 14px; min-height: 140px; max-height: 260px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .msg {
+    max-width: 88%; padding: 10px 13px;
+    border-radius: 12px; font-size: 14px; line-height: 1.5;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg.bot {
+    background: rgba(0,188,212,0.08); border: 1px solid rgba(0,188,212,0.2);
+    align-self: flex-start; color: var(--text);
+  }
+  .msg.user {
+    background: var(--orange-dim); border: 1px solid rgba(247,147,26,0.25);
+    align-self: flex-end; color: var(--text);
+  }
+  .msg.bot strong { color: var(--cyan); }
+  .msg.alert-msg { background: rgba(255,23,68,0.1); border-color: rgba(255,23,68,0.3); }
+  .typing { display: flex; gap: 5px; padding: 10px 13px; align-self: flex-start; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); animation: bounce 1s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-8px)} }
+
+  .ai-input-row {
+    padding: 12px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .ai-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Rajdhani'; font-size: 14px;
+    padding: 9px 12px; border-radius: 8px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .ai-input:focus { border-color: var(--cyan); }
+  .ai-input::placeholder { color: var(--muted); }
+  .send-btn {
+    background: var(--cyan); border: none; border-radius: 8px;
+    width: 38px; height: 38px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.2s;
+  }
+  .send-btn:active { transform: scale(0.93); }
+
+  /* Quick asks */
+  .quick-asks { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+  .quick-btn {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--muted); font-family: 'Rajdhani'; font-size: 12px;
+    padding: 5px 10px; border-radius: 20px; cursor: pointer;
+    transition: all 0.2s; font-weight: 600;
+  }
+  .quick-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+  /* Alert Log */
+  .alert-log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .log-entry {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px; animation: slideIn 0.3s ease;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .log-dot.up { background: var(--green); }
+  .log-dot.down { background: var(--red); }
+  .log-dot.info { background: var(--cyan); }
+  .log-time { font-family: 'Share Tech Mono'; font-size: 11px; color: var(--muted); }
+  .log-text { flex: 1; }
+  .log-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+  .log-badge.up { background: var(--green-dim); color: var(--green); }
+  .log-badge.down { background: var(--red-dim); color: var(--red); }
+
+  /* Refresh btn */
+  .refresh-row { display: flex; justify-content: center; margin-bottom: 14px; }
+  .refresh-btn {
+    background: var(--orange-dim); border: 1px solid rgba(247,147,26,0.3);
+    color: var(--orange); font-family: 'Rajdhani'; font-size: 14px; font-weight: 700;
+    padding: 9px 24px; border-radius: 8px; cursor: pointer; letter-spacing: 1px;
+    transition: all 0.2s; display: flex; align-items: center; gap: 7px;
+  }
+  .refresh-btn:active { transform: scale(0.97); }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="btc-icon">₿</div>
+      <div>
+        <div class="logo-text">BTC <span>ALERT</span> BOT</div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:1px">POWERED BY AI</div>
+      </div>
+    </div>
+    <div class="status-dot"></div>
+  </div>
+
+  <!-- Price Card -->
+  <div class="price-card">
+    <div class="price-row">
+      <div>
+        <div class="price-label">Prix Bitcoin</div>
+        <div class="price-main" id="btcPrice">$--,---</div>
+        <span class="price-change" id="priceChange"><span>--</span></span>
+      </div>
+      <div style="text-align:right">
+        <div class="price-label">24h High</div>
+        <div style="font-family:'Share Tech Mono';font-size:15px;color:var(--green)" id="highPrice">--</div>
+        <div class="price-label" style="margin-top:6px">24h Low</div>
+        <div style="font-family:'Share Tech Mono';font-size:15px;color:var(--red)" id="lowPrice">--</div>
+      </div>
+    </div>
+    <div class="last-update" id="lastUpdate" style="margin-top:8px">Dernière MAJ : --</div>
+  </div>
+
+  <!-- Refresh -->
+  <div class="refresh-row">
+    <button class="refresh-btn" onclick="fetchPrice()" id="refreshBtn">
+      <span id="refreshIcon">↻</span> Actualiser
+    </button>
+  </div>
+
+  <!-- Signal Polymarket-style -->
+  <div class="signal-bar">
+    <div class="signal-title">Signal Up/Down — Prédiction IA</div>
+    <div class="signal-buttons">
+      <button class="sig-btn up" id="btnUp" onclick="setSignal('up')">▲ BUY UP</button>
+      <button class="sig-btn down" id="btnDown" onclick="setSignal('down')">▼ BUY DOWN</button>
+    </div>
+    <div class="signal-meter" style="margin-top:10px">
+      <div class="meter-track">
+        <div class="meter-fill" id="meterFill" style="width:50%;background:linear-gradient(90deg,var(--red),var(--green))"></div>
+      </div>
+      <div class="meter-labels">
+        <span style="color:var(--red)">DOWN <span id="downPct">50</span>%</span>
+        <span style="color:var(--green)">UP <span id="upPct">50</span>%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Config -->
+  <div class="alert-config">
+    <div class="section-title">Configuration des Alertes</div>
+    <div class="alert-row">
+      <div class="alert-label">Alerte Hausse<small>Notifier si BTC dépasse</small></div>
+      <div class="input-group">
+        <input class="price-input" type="number" id="alertUp" placeholder="80000">
+        <div class="toggle" id="toggleUp" onclick="toggleAlert('up')"></div>
+      </div>
+    </div>
+    <div class="alert-row">
+      <div class="alert-label">Alerte Baisse<small>Notifier si BTC passe sous</small></div>
+      <div class="input-group">
+        <input class="price-input" type="number" id="alertDown" placeholder="70000">
+        <div class="toggle" id="toggleDown" onclick="toggleAlert('down')"></div>
+      </div>
+    </div>
+    <div class="alert-row">
+      <div class="alert-label">Variation rapide<small>Alerte si ±2% en 5 min</small></div>
+      <div class="toggle on" id="toggleVolatility" onclick="toggleAlert('volatility')"></div>
+    </div>
+  </div>
+
+  <!-- AI Chat -->
+  <div class="ai-panel">
+    <div class="ai-header">
+      <div class="ai-avatar">🤖</div>
+      <div>
+        <div class="ai-name">CryptoBot IA</div>
+        <div class="ai-sub">Analyse BTC en temps réel</div>
+      </div>
+    </div>
+    <div class="ai-messages" id="chatBox">
+      <div class="msg bot">Salut ! Je suis ton assistant crypto. Pose-moi n'importe quelle question sur le Bitcoin — analyse, stratégie, signaux. <strong>Je suis connecté aux données en direct.</strong></div>
+    </div>
+    <div class="quick-asks">
+      <button class="quick-btn" onclick="quickAsk('Analyse le prix actuel du BTC')">📊 Analyse</button>
+      <button class="quick-btn" onclick="quickAsk('Est-ce le bon moment pour acheter du BTC ?')">💰 Acheter ?</button>
+      <button class="quick-btn" onclick="quickAsk('Quelle est la tendance BTC cette semaine ?')">📈 Tendance</button>
+      <button class="quick-btn" onclick="quickAsk('Explique-moi le signal Polymarket BTC')">🎯 Polymarket</button>
+    </div>
+    <div class="ai-input-row">
+      <input class="ai-input" id="aiInput" placeholder="Demande quelque chose..." onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="send-btn" onclick="sendMsg()">➤</button>
+    </div>
+  </div>
+
+  <!-- Alert Log -->
+  <div class="alert-log">
+    <div class="section-title">Journal des Alertes</div>
+    <div id="alertLog">
+      <div class="log-entry">
+        <div class="log-dot info"></div>
+        <div class="log-text">Bot démarré</div>
+        <div class="log-time" id="startTime">--:--</div>
+        <div class="log-badge" style="background:rgba(0,188,212,0.1);color:var(--cyan)">INFO</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────
+let currentPrice = null;
+let prevPrice = null;
+let priceHistory = [];
+let alertUpEnabled = false;
+let alertDownEnabled = false;
+let alertVolEnabled = true;
+let alertUpTriggered = false;
+let alertDownTriggered = false;
+let chatHistory = [];
+
+// ─── Init ─────────────────────────────────────────────
+window.onload = () => {
+  document.getElementById('startTime').textContent = now();
+  fetchPrice();
+  updateSignalMeter();
+  setInterval(fetchPrice, 30000);
+};
+
+function now() {
+  return new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ─── Price Fetch ──────────────────────────────────────
+async function fetchPrice() {
+  const icon = document.getElementById('refreshIcon');
+  icon.classList.add('spin');
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_high_low=true');
+    const d = await r.json();
+    const btc = d.bitcoin;
+    prevPrice = currentPrice;
+    currentPrice = btc.usd;
+    priceHistory.push(currentPrice);
+    if (priceHistory.length > 20) priceHistory.shift();
+
+    document.getElementById('btcPrice').textContent = '$' + currentPrice.toLocaleString('en-US', {minimumFractionDigits:2});
+    document.getElementById('lastUpdate').textContent = 'Dernière MAJ : ' + now();
+
+    const change = btc.usd_24h_change;
+    const el = document.getElementById('priceChange');
+    el.textContent = (change >= 0 ? '▲ +' : '▼ ') + change.toFixed(2) + '%';
+    el.className = 'price-change ' + (change >= 0 ? 'up' : 'down');
+
+    document.getElementById('highPrice').textContent = btc.usd_24h_high ? '$' + btc.usd_24h_high.toLocaleString('en-US',{maximumFractionDigits:0}) : '--';
+    document.getElementById('lowPrice').textContent = btc.usd_24h_low ? '$' + btc.usd_24h_low.toLocaleString('en-US',{maximumFractionDigits:0}) : '--';
+
+    updateSignalMeter(change);
+    checkAlerts(currentPrice, prevPrice, change);
+  } catch(e) {
+    addLog('Erreur chargement prix', 'info');
+  }
+  icon.classList.remove('spin');
+}
+
+// ─── Signal Meter ─────────────────────────────────────
+function updateSignalMeter(change) {
+  let upPct = 50;
+  if (change !== undefined) {
+    upPct = Math.min(95, Math.max(5, 50 + change * 3));
+  }
+  const downPct = 100 - upPct;
+  document.getElementById('upPct').textContent = Math.round(upPct);
+  document.getElementById('downPct').textContent = Math.round(downPct);
+  const fill = document.getElementById('meterFill');
+  fill.style.width = upPct + '%';
+  if (upPct > 60) fill.style.background = 'var(--green)';
+  else if (upPct < 40) fill.style.background = 'var(--red)';
+  else fill.style.background = 'linear-gradient(90deg,var(--red),var(--orange),var(--green))';
+}
+
+// ─── Signal buttons ───────────────────────────────────
+function setSignal(dir) {
+  document.getElementById('btnUp').className = 'sig-btn up' + (dir==='up' ? ' active-up' : '');
+  document.getElementById('btnDown').className = 'sig-btn down' + (dir==='down' ? ' active-down' : '');
+  addLog('Signal ' + (dir==='up' ? '▲ UP' : '▼ DOWN') + ' placé', dir);
+}
+
+// ─── Toggles ──────────────────────────────────────────
+function toggleAlert(type) {
+  const el = document.getElementById('toggle' + type.charAt(0).toUpperCase() + type.slice(1));
+  el.classList.toggle('on');
+  if (type==='up') alertUpEnabled = el.classList.contains('on');
+  if (type==='down') alertDownEnabled = el.classList.contains('on');
+  if (type==='volatility') alertVolEnabled = el.classList.contains('on');
+}
+
+// ─── Alert Checks ─────────────────────────────────────
+function checkAlerts(price, prev, change) {
+  const up = parseFloat(document.getElementById('alertUp').value);
+  const down = parseFloat(document.getElementById('alertDown').value);
+
+  if (alertUpEnabled && up && price >= up && !alertUpTriggered) {
+    alertUpTriggered = true;
+    addLog('🚨 BTC a dépassé $' + up.toLocaleString(), 'up');
+    addBotMessage('🚨 **ALERTE HAUSSE !** Le Bitcoin vient de dépasser ton seuil de $' + up.toLocaleString() + '. Prix actuel : $' + price.toLocaleString() + '. Considère de prendre des profits !');
+  }
+  if (alertDownEnabled && down && price <= down && !alertDownTriggered) {
+    alertDownTriggered = true;
+    addLog('🚨 BTC est tombé sous $' + down.toLocaleString(), 'down');
+    addBotMessage('🚨 **ALERTE BAISSE !** Le Bitcoin est passé sous ton seuil de $' + down.toLocaleString() + '. Prix actuel : $' + price.toLocaleString() + '. Surveille bien !');
+  }
+  if (alertVolEnabled && prev && Math.abs((price - prev) / prev * 100) >= 1) {
+    const pct = ((price - prev) / prev * 100).toFixed(2);
+    addLog('Variation rapide : ' + (pct > 0 ? '+' : '') + pct + '%', pct > 0 ? 'up' : 'down');
+  }
+  // Reset triggers if price moves back
+  if (up && price < up * 0.998) alertUpTriggered = false;
+  if (down && price > down * 1.002) alertDownTriggered = false;
+}
+
+// ─── Log ──────────────────────────────────────────────
+function addLog(text, type) {
+  const log = document.getElementById('alertLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const badge = type==='up' ? '<div class="log-badge up">UP</div>' : type==='down' ? '<div class="log-badge down">DOWN</div>' : '<div class="log-badge" style="background:rgba(0,188,212,0.1);color:var(--cyan)">INFO</div>';
+  entry.innerHTML = `<div class="log-dot ${type}"></div><div class="log-text">${text}</div><div class="log-time">${now()}</div>${badge}`;
+  log.insertBefore(entry, log.firstChild);
+  if (log.children.length > 8) log.removeChild(log.lastChild);
+}
+
+// ─── AI Chat ──────────────────────────────────────────
+function quickAsk(q) {
+  document.getElementById('aiInput').value = q;
+  sendMsg();
+}
+
+async function sendMsg() {
+  const input = document.getElementById('aiInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  appendMsg(msg, 'user');
+
+  const typing = document.createElement('div');
+  typing.className = 'typing';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  typing.id = 'typing';
+  document.getElementById('chatBox').appendChild(typing);
+  scrollChat();
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  const priceContext = currentPrice
+    ? `Prix BTC actuel : $${currentPrice.toLocaleString()}. Données en direct disponibles.`
+    : 'Prix BTC non chargé encore.';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `Tu es CryptoBot, un assistant IA expert en Bitcoin et crypto-monnaies. Tu fournis des analyses concises, des signaux de trading et des insights de marché. ${priceContext} Réponds en français, de façon directe et utile. Maximum 3 phrases. Utilise des emojis pertinents.`,
+        messages: chatHistory
+      })
+    });
+    const d = await res.json();
+    const reply = d.content?.[0]?.text || 'Désolé, problème de connexion.';
+    chatHistory.push({ role: 'assistant', content: reply });
+    document.getElementById('typing')?.remove();
+    addBotMessage(reply);
+  } catch(e) {
+    document.getElementById('typing')?.remove();
+    addBotMessage('❌ Erreur de connexion à l\'IA. Vérifie ta connexion internet.');
+  }
+}
+
+function appendMsg(text, role) {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+  box.appendChild(div);
+  scrollChat();
+}
+
+function addBotMessage(text) {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  box.appendChild(div);
+  scrollChat();
+}
+
+function scrollChat() {
+  const box = document.getElementById('chatBox');
+  box.scrollTop = box.scrollHeight;
+}
+</script>
+</body>
+</html>
